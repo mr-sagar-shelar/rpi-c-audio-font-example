@@ -1,0 +1,17 @@
+services:
+  picore-builder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      OUTPUT_DIR: /workspace/out
+      TARGET_ARCH: ${TARGET_ARCH:-aarch64}
+      TINYCORE_MAJOR: ${TINYCORE_MAJOR:-16.x}
+      WIFI_SSID: ${WIFI_SSID:-}
+      WIFI_PSK: ${WIFI_PSK:-}
+      WIFI_COUNTRY: ${WIFI_COUNTRY:-IN}
+      ALSA_CARD: ${ALSA_CARD:-0}
+      ALSA_DEVICE: ${ALSA_DEVICE:-0}
+      ENABLE_HDMI_AUDIO: ${ENABLE_HDMI_AUDIO:-0}
+    volumes:
+      - .:/workspace
