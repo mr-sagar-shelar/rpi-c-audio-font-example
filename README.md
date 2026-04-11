@@ -149,9 +149,9 @@ The new `wm8960_tones` example targets the Waveshare WM8960 Audio HAT.
 
 When `wm8960_tones` runs on the Raspberry Pi, it:
 
-- opens an ALSA playback device, defaulting to `default`
-- plays random tones at a fixed interval
-- alternates output between left speaker, right speaker, and both speakers to simulate stereo capability
+- records microphone input for 5 seconds
+- can play back the recorded audio through the speaker path
+- includes a stereo tone demo that alternates output between left, right, and both channels
 
 Use `HARDWARE_PROFILE=wm8960-audio-hat` when building the TinyCore image so the Pi boot config appends:
 

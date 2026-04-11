@@ -10,7 +10,7 @@
 
 #define WM8960_SAMPLE_RATE 48000
 #define WM8960_CHANNELS 2
-#define WM8960_MAX_FRAMES 48000
+#define WM8960_RECORD_SECONDS 5
 
 typedef enum {
     WM8960_PAN_LEFT = 0,
@@ -45,10 +45,10 @@ static const char *wm8960_pan_name(wm8960_pan_t pan) {
     }
 }
 
-static int wm8960_open_pcm(const char *device, snd_pcm_t **pcm_handle) {
+static int wm8960_open_pcm(const char *device, snd_pcm_stream_t stream, snd_pcm_t **pcm_handle) {
     int err;
 
-    if ((err = snd_pcm_open(pcm_handle, device, SND_PCM_STREAM_PLAYBACK, 0)) < 0) {
+    if ((err = snd_pcm_open(pcm_handle, device, stream, 0)) < 0) {
         fprintf(stderr, "Error opening PCM device '%s': %s\n", device, snd_strerror(err));
         return -1;
     }
@@ -60,7 +60,7 @@ static int wm8960_open_pcm(const char *device, snd_pcm_t **pcm_handle) {
                                   WM8960_SAMPLE_RATE,
                                   1,
                                   500000)) < 0) {
-        fprintf(stderr, "Playback parameter error: %s\n", snd_strerror(err));
+        fprintf(stderr, "PCM parameter error on '%s': %s\n", device, snd_strerror(err));
         snd_pcm_close(*pcm_handle);
         *pcm_handle = NULL;
         return -1;
@@ -75,9 +75,6 @@ static void wm8960_play_stereo_tone(snd_pcm_t *pcm_handle, double frequency, dou
 
     if (frames <= 0) {
         return;
-    }
-    if (frames > WM8960_MAX_FRAMES) {
-        frames = WM8960_MAX_FRAMES;
     }
 
     buffer = malloc((size_t)frames * WM8960_CHANNELS * sizeof(int16_t));
@@ -111,41 +108,161 @@ static void wm8960_play_stereo_tone(snd_pcm_t *pcm_handle, double frequency, dou
     free(buffer);
 }
 
-int main(int argc, char **argv) {
-    const char *device = argc > 1 ? argv[1] : "default";
-    long interval_ms = argc > 2 ? strtol(argv[2], NULL, 10) : 900;
-    snd_pcm_t *pcm_handle = NULL;
+static void wm8960_run_tone_demo(const char *playback_device) {
+    snd_pcm_t *playback_handle = NULL;
     const double notes[] = {220.00, 261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 659.25};
     const size_t note_count = sizeof(notes) / sizeof(notes[0]);
-    unsigned int seed = (unsigned int)time(NULL);
 
-    signal(SIGINT, handle_signal);
-    signal(SIGTERM, handle_signal);
-
-    if (interval_ms < 100) {
-        interval_ms = 100;
+    if (wm8960_open_pcm(playback_device, SND_PCM_STREAM_PLAYBACK, &playback_handle) != 0) {
+        fprintf(stderr, "Unable to start stereo tone demo on '%s'.\n", playback_device);
+        return;
     }
 
-    srand(seed);
-
-    if (wm8960_open_pcm(device, &pcm_handle) != 0) {
-        fprintf(stderr, "WM8960 tone demo could not open ALSA device '%s'.\n", device);
-        return 1;
-    }
-
-    printf("WM8960 stereo tone demo running on '%s'\n", device);
-    printf("Press Ctrl+C to stop.\n");
-
-    while (keep_running) {
+    printf("Stereo tone demo on '%s'\n", playback_device);
+    for (int i = 0; i < 6 && keep_running; i++) {
         double frequency = notes[rand() % note_count];
         wm8960_pan_t pan = (wm8960_pan_t)(rand() % 3);
 
         printf("Playing %.2f Hz on %s\n", frequency, wm8960_pan_name(pan));
-        wm8960_play_stereo_tone(pcm_handle, frequency, 0.28, pan);
-        snd_pcm_drain(pcm_handle);
-        sleep_for_ms(interval_ms);
+        wm8960_play_stereo_tone(playback_handle, frequency, 0.28, pan);
+        snd_pcm_drain(playback_handle);
+        sleep_for_ms(500);
     }
 
-    snd_pcm_close(pcm_handle);
+    snd_pcm_close(playback_handle);
+}
+
+static int wm8960_record_audio(const char *capture_device, int16_t **recorded_buffer, size_t *recorded_frames) {
+    snd_pcm_t *capture_handle = NULL;
+    size_t total_frames = WM8960_SAMPLE_RATE * WM8960_RECORD_SECONDS;
+    size_t captured_frames = 0;
+    int16_t *buffer;
+
+    buffer = malloc(total_frames * WM8960_CHANNELS * sizeof(int16_t));
+    if (buffer == NULL) {
+        fprintf(stderr, "Memory allocation failed\n");
+        return -1;
+    }
+
+    if (wm8960_open_pcm(capture_device, SND_PCM_STREAM_CAPTURE, &capture_handle) != 0) {
+        free(buffer);
+        fprintf(stderr, "Unable to start recording from '%s'.\n", capture_device);
+        return -1;
+    }
+
+    printf("Recording microphone for %d seconds from '%s'...\n", WM8960_RECORD_SECONDS, capture_device);
+    while (captured_frames < total_frames && keep_running) {
+        size_t frames_left = total_frames - captured_frames;
+        snd_pcm_sframes_t chunk = frames_left > 1024 ? 1024 : (snd_pcm_sframes_t)frames_left;
+        snd_pcm_sframes_t read_frames = snd_pcm_readi(capture_handle,
+                                                      buffer + (captured_frames * WM8960_CHANNELS),
+                                                      chunk);
+
+        if (read_frames < 0) {
+            snd_pcm_prepare(capture_handle);
+            continue;
+        }
+
+        captured_frames += (size_t)read_frames;
+    }
+
+    snd_pcm_close(capture_handle);
+
+    *recorded_buffer = buffer;
+    *recorded_frames = captured_frames;
+    printf("Recorded %zu frames.\n", captured_frames);
+    return 0;
+}
+
+static int wm8960_play_recording(const char *playback_device, const int16_t *recorded_buffer, size_t recorded_frames) {
+    snd_pcm_t *playback_handle = NULL;
+    size_t played_frames = 0;
+
+    if (recorded_buffer == NULL || recorded_frames == 0) {
+        printf("No recording available. Record first.\n");
+        return -1;
+    }
+
+    if (wm8960_open_pcm(playback_device, SND_PCM_STREAM_PLAYBACK, &playback_handle) != 0) {
+        fprintf(stderr, "Unable to play recording on '%s'.\n", playback_device);
+        return -1;
+    }
+
+    printf("Playing back recorded audio on '%s'...\n", playback_device);
+    while (played_frames < recorded_frames && keep_running) {
+        size_t frames_left = recorded_frames - played_frames;
+        snd_pcm_sframes_t chunk = frames_left > 1024 ? 1024 : (snd_pcm_sframes_t)frames_left;
+        snd_pcm_sframes_t written_frames = snd_pcm_writei(playback_handle,
+                                                          recorded_buffer + (played_frames * WM8960_CHANNELS),
+                                                          chunk);
+
+        if (written_frames < 0) {
+            snd_pcm_prepare(playback_handle);
+            continue;
+        }
+
+        played_frames += (size_t)written_frames;
+    }
+
+    snd_pcm_drain(playback_handle);
+    snd_pcm_close(playback_handle);
+    return 0;
+}
+
+int main(int argc, char **argv) {
+    const char *playback_device = argc > 1 ? argv[1] : "default";
+    const char *capture_device = argc > 2 ? argv[2] : "default";
+    int16_t *recorded_buffer = NULL;
+    size_t recorded_frames = 0;
+
+    signal(SIGINT, handle_signal);
+    signal(SIGTERM, handle_signal);
+
+    srand((unsigned int)time(NULL));
+
+    printf("WM8960 audio validation tool\n");
+    printf("Playback device: %s\n", playback_device);
+    printf("Capture device: %s\n", capture_device);
+
+    while (keep_running) {
+        int choice;
+
+        printf("\n=== WM8960 Menu ===\n");
+        printf("1. Record microphone for %d seconds\n", WM8960_RECORD_SECONDS);
+        printf("2. Playback recorded audio\n");
+        printf("3. Run stereo tone demo\n");
+        printf("4. Exit\n");
+        printf("Select an option: ");
+
+        if (scanf("%d", &choice) != 1) {
+            while (getchar() != '\n') {
+            }
+            printf("Invalid input.\n");
+            continue;
+        }
+
+        switch (choice) {
+            case 1:
+                free(recorded_buffer);
+                recorded_buffer = NULL;
+                recorded_frames = 0;
+                wm8960_record_audio(capture_device, &recorded_buffer, &recorded_frames);
+                break;
+            case 2:
+                wm8960_play_recording(playback_device, recorded_buffer, recorded_frames);
+                break;
+            case 3:
+                wm8960_run_tone_demo(playback_device);
+                break;
+            case 4:
+                keep_running = 0;
+                break;
+            default:
+                printf("Invalid choice.\n");
+                break;
+        }
+    }
+
+    free(recorded_buffer);
     return 0;
 }
