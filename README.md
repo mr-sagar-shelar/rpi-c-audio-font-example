@@ -31,6 +31,7 @@ This exports one executable per example source into:
 - `build/tinycore/artifacts/bin/pirate_audio_hat`
 - `build/tinycore/artifacts/bin/rv3028_rtc_menu`
 - `build/tinycore/artifacts/bin/second`
+- `build/tinycore/artifacts/bin/tea5767_radio_menu`
 - `build/tinycore/artifacts/bin/third`
 - `build/tinycore/artifacts/bin/ups_hat_c_status`
 - `build/tinycore/artifacts/bin/wm8960_tones`
@@ -46,6 +47,7 @@ The build also exports a source workspace snapshot that is copied into the TinyC
 Build the executables, TinyCore extension artifacts, and the final flashable piCore image on macOS:
 
 ```bash
+INCLUDE_DEV_TOOLS="1" \
 WIFI_SSID="YourWiFi" \
 WIFI_PSK="YourPassword" \
 WIFI_COUNTRY="IN" \
@@ -101,6 +103,14 @@ For the Pimoroni RV3028 RTC breakout, build with its hardware profile enabled:
 
 ```bash
 HARDWARE_PROFILE="rv3028-rtc" \
+TARGET_ARCH="aarch64" \
+bash /Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/scripts/build-artifacts.sh
+```
+
+For the TEA5767 FM radio module, build with its hardware profile enabled:
+
+```bash
+HARDWARE_PROFILE="tea5767-fm-radio" \
 TARGET_ARCH="aarch64" \
 bash /Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/scripts/build-artifacts.sh
 ```
@@ -271,6 +281,54 @@ Use `HARDWARE_PROFILE=rv3028-rtc` so the Pi boot config appends:
 
 Important note:
 This example uses the RTC clock/calendar registers directly and persists up to five alarms in the RV3028 user EEPROM. The alarm matching and display are handled by the application menu loop rather than a kernel RTC alarm interrupt.
+
+## TEA5767 FM Radio Example
+
+The new `tea5767_radio_menu` example targets the TEA5767 FM radio module.
+
+What it does:
+
+- lists preset FM stations
+- lets you tune to a preset
+- lets you enter a manual FM frequency
+- supports step tuning up and down by `0.1 MHz`
+- shows tuner status, stereo flag, and signal level
+- supports mute/unmute from the menu
+
+Build the TinyCore image with:
+
+```bash
+HARDWARE_PROFILE="tea5767-fm-radio" \
+TARGET_ARCH="aarch64" \
+bash /Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/scripts/build-artifacts.sh
+```
+
+Wiring to Raspberry Pi 3:
+
+```text
+TEA5767 module                Raspberry Pi 3
+---------------------------   -------------------------------
+VCC                        -> physical pin 1 (3.3V)
+GND                        -> physical pin 6 (GND)
+SDA                        -> physical pin 3 (GPIO2 / SDA1)
+SCL                        -> physical pin 5 (GPIO3 / SCL1)
+LOUT                       -> external amplifier/speaker left in
+ROUT                       -> external amplifier/speaker right in
+ANT                        -> detachable antenna
+```
+
+Recommended connection notes:
+
+- Start with `3.3V` on `VCC` unless your exact module board is clearly labeled as `5V` safe for logic and supply.
+- The TEA5767 module generates analog audio itself, so `LOUT` and `ROUT` should go to amplified speakers, headphones with proper conditioning, or another analog audio stage.
+- This module does not route FM audio into Raspberry Pi HDMI, the 3.5 mm jack, or ALSA by itself.
+
+Use `HARDWARE_PROFILE=tea5767-fm-radio` so the Pi boot config appends:
+
+- `dtparam=i2c_arm=on`
+
+Important note:
+The TEA5767 outputs analog audio directly from the module. It is controlled by the Raspberry Pi over I2C, but its radio audio does not pass through the Raspberry Pi ALSA audio subsystem unless you separately wire its analog output into another audio input path.
 
 ## Notes
 
