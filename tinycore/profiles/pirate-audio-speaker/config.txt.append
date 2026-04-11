@@ -1,0 +1,2 @@
+dtoverlay=hifiberry-dac
+gpio=25=op,dh

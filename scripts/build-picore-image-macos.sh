@@ -16,6 +16,7 @@ WIFI_COUNTRY="${WIFI_COUNTRY:-IN}"
 ALSA_CARD="${ALSA_CARD:-0}"
 ALSA_DEVICE="${ALSA_DEVICE:-0}"
 ENABLE_HDMI_AUDIO="${ENABLE_HDMI_AUDIO:-0}"
+HARDWARE_PROFILE="${HARDWARE_PROFILE:-}"
 RELEASE_BASE_URL="${RELEASE_BASE_URL:-}"
 EXT_BASE_URL="${EXT_BASE_URL:-}"
 RELEASE_IMAGE="${RELEASE_IMAGE:-}"
@@ -356,6 +357,11 @@ require_file "$ARTIFACT_DIR/onboot.lst"
 require_file "$ARTIFACT_DIR/config.txt.append"
 require_file "$ARTIFACT_DIR/cmdline.append"
 
+if [ -n "$HARDWARE_PROFILE" ] && [ ! -d "$ROOT_DIR/tinycore/profiles/$HARDWARE_PROFILE" ]; then
+    printf 'Unknown HARDWARE_PROFILE: %s\n' "$HARDWARE_PROFILE" >&2
+    exit 1
+fi
+
 mkdir -p "$WORK_DIR" "$CACHE_DIR" "$OUTPUT_DIR"
 
 if [ -z "$RELEASE_IMAGE" ]; then
@@ -466,6 +472,11 @@ done < "$ONBOOT_FILE"
 
 append_unique_lines "$ARTIFACT_DIR/config.txt.append" "$BOOT_MOUNT/config.txt"
 append_cmdline_tokens "$ARTIFACT_DIR/cmdline.append" "$BOOT_MOUNT/cmdline.txt"
+
+if [ -n "$HARDWARE_PROFILE" ]; then
+    append_unique_lines "$ROOT_DIR/tinycore/profiles/$HARDWARE_PROFILE/config.txt.append" "$BOOT_MOUNT/config.txt"
+    append_cmdline_tokens "$ROOT_DIR/tinycore/profiles/$HARDWARE_PROFILE/cmdline.append" "$BOOT_MOUNT/cmdline.txt"
+fi
 
 if [ "$ENABLE_HDMI_AUDIO" = "1" ]; then
     if ! grep -Fqx 'hdmi_force_hotplug=1' "$BOOT_MOUNT/config.txt"; then

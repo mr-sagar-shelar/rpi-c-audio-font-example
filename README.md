@@ -27,6 +27,7 @@ This exports one executable per example source into:
 
 - `build/tinycore/artifacts/bin/first`
 - `build/tinycore/artifacts/bin/lcd_hat_menu`
+- `build/tinycore/artifacts/bin/pirate_audio_hat`
 - `build/tinycore/artifacts/bin/second`
 - `build/tinycore/artifacts/bin/third`
 
@@ -47,6 +48,14 @@ bash /Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/scripts/build-artifac
 ```
 
 The final image is written to [out/](/Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/out).
+
+For the Pirate Audio speaker HAT, build with its hardware profile enabled:
+
+```bash
+HARDWARE_PROFILE="pirate-audio-speaker" \
+TARGET_ARCH="aarch64" \
+bash /Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/scripts/build-artifacts.sh
+```
 
 ## Output
 
@@ -97,6 +106,21 @@ The TinyCore image build now appends these boot settings automatically:
 - `gpio=6,19,5,26,13,21,20,16=pu`
 
 Those pull-ups match the common 1.44 inch LCD HAT button wiring used by Waveshare's documentation.
+
+## Pirate Audio Speaker Example
+
+The new `pirate_audio_hat` example targets Pimoroni's Pirate Audio speaker board with display and buttons.
+
+When `pirate_audio_hat` runs on the Raspberry Pi, it:
+
+- draws sample text on the Pirate Audio display
+- shows the last button pressed: `BUTTON A`, `BUTTON B`, `BUTTON X`, or `BUTTON Y`
+- plays a different tone for each button to demonstrate the speaker/audio path
+
+Use `HARDWARE_PROFILE=pirate-audio-speaker` when building the TinyCore image so the Pi boot config also appends:
+
+- `dtoverlay=hifiberry-dac`
+- `gpio=25=op,dh`
 
 ## Notes
 

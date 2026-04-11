@@ -46,6 +46,18 @@ void demo_play_tone(snd_pcm_t *pcm_handle, double freq, double duration) {
     free(buffer);
 }
 
+void demo_play_single_tone(const char *device, double freq, double duration) {
+    snd_pcm_t *pcm_handle = NULL;
+
+    if (demo_open_playback_device(device, &pcm_handle) != 0) {
+        return;
+    }
+
+    demo_play_tone(pcm_handle, freq, duration);
+    snd_pcm_drain(pcm_handle);
+    snd_pcm_close(pcm_handle);
+}
+
 void demo_play_c_major_arpeggio(const char *device) {
     snd_pcm_t *pcm_handle = NULL;
 
