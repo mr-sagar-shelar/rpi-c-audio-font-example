@@ -30,6 +30,7 @@ This exports one executable per example source into:
 - `build/tinycore/artifacts/bin/pirate_audio_hat`
 - `build/tinycore/artifacts/bin/second`
 - `build/tinycore/artifacts/bin/third`
+- `build/tinycore/artifacts/bin/ups_hat_c_status`
 - `build/tinycore/artifacts/bin/wm8960_tones`
 
 Any new file you add under `examples/`, such as `examples/fourth.c`, will automatically produce `build/tinycore/artifacts/bin/fourth`.
@@ -66,6 +67,14 @@ TARGET_ARCH="aarch64" \
 bash /Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/scripts/build-artifacts.sh
 ```
 
+For the Waveshare UPS HAT (C), build with its hardware profile enabled:
+
+```bash
+HARDWARE_PROFILE="ups-hat-c" \
+TARGET_ARCH="aarch64" \
+bash /Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/scripts/build-artifacts.sh
+```
+
 ## Output
 
 The build creates:
@@ -77,8 +86,11 @@ The build creates:
 - `build/tinycore/artifacts/onboot.lst`
 - `out/custom-picore-rpi3-aarch64.img`
 - `out/custom-picore-rpi3-aarch64.img.gz`
+- `out/custom-picore-rpi3-wm8960-audio-hat-aarch64.img`
+- `out/custom-picore-rpi3-lcd-hat-aarch64.img`
 
 Set `TARGET_ARCH=armhf` if you prefer 32-bit piCore.
+If `HARDWARE_PROFILE` is set, the generated image name includes that profile.
 
 ## What Boots
 
@@ -148,6 +160,23 @@ Use `HARDWARE_PROFILE=wm8960-audio-hat` when building the TinyCore image so the 
 
 Important limitation:
 Waveshare's own wiki and driver repository indicate that this HAT depends on their `wm8960-soundcard` driver/overlay stack. This repo now includes the example program and TinyCore profile hook, but a fully working TinyCore image may still require integrating the Waveshare driver package or matching overlay/module files for the exact Raspberry Pi kernel used by the piCore image.
+
+## UPS HAT C Example
+
+The new `ups_hat_c_status` example targets the Waveshare UPS HAT (C).
+
+When `ups_hat_c_status` runs on the Raspberry Pi, it:
+
+- reads bus voltage and current from the onboard INA219 over I2C
+- estimates battery percentage from measured voltage
+- reports charging, discharging, or idle state from current direction
+
+Use `HARDWARE_PROFILE=ups-hat-c` when building the TinyCore image so the Pi boot config appends:
+
+- `dtparam=i2c_arm=on`
+
+Important note:
+Waveshare documents INA219-based monitoring for this HAT. The percentage shown by this C example is a practical voltage-based estimate, not a dedicated fuel-gauge reading from the board.
 
 ## Notes
 

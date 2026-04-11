@@ -49,7 +49,14 @@ RELEASE_VERSION_RESOLVED=""
 AUDIO_MODULES_EXT_DISCOVERED=""
 WIRELESS_MODULES_EXT_DISCOVERED=""
 EXT_CACHE_DIR=""
-OUTPUT_IMAGE="${OUTPUT_IMAGE:-$OUTPUT_DIR/custom-picore-rpi3-${TARGET_ARCH}.img}"
+
+image_profile_suffix() {
+    if [ -n "$HARDWARE_PROFILE" ]; then
+        printf '%s' "-$HARDWARE_PROFILE"
+    fi
+}
+
+OUTPUT_IMAGE="${OUTPUT_IMAGE:-$OUTPUT_DIR/custom-picore-rpi3$(image_profile_suffix)-${TARGET_ARCH}.img}"
 
 require_file() {
     [ -f "$1" ] || {
