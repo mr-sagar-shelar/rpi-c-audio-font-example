@@ -316,12 +316,26 @@ download_extension_tree() {
 build_mydata_tgz() {
     mydata_root="$WORK_DIR/mydata-root"
     mydata_tgz="$WORK_DIR/mydata.tgz"
+    workspace_dir="$mydata_root/home/tc/demo-workspace"
 
     rm -rf "$mydata_root"
-    mkdir -p "$mydata_root/opt" "$mydata_root/etc" "$mydata_root/home/tc"
+    mkdir -p "$mydata_root/opt" "$mydata_root/etc" "$mydata_root/home/tc" "$workspace_dir"
 
     cp "$ROOT_DIR/tinycore/overlay/opt/bootlocal.sh" "$mydata_root/opt/bootlocal.sh"
     cp "$ROOT_DIR/tinycore/overlay/opt/.filetool.lst" "$mydata_root/opt/.filetool.lst"
+
+    if [ -d "$ARTIFACT_DIR/demo-workspace" ]; then
+        cp -R "$ARTIFACT_DIR/demo-workspace/." "$workspace_dir/"
+        cat > "$workspace_dir/build-on-pi.sh" <<'EOF'
+#!/bin/sh
+set -eu
+cd "$(dirname "$0")"
+make clean
+make TARGET_ARCH=native all
+printf 'Native binaries built in %s/build/local-bin\n' "$(pwd)"
+EOF
+        chmod 0755 "$workspace_dir/build-on-pi.sh"
+    fi
 
     cat > "$mydata_root/etc/asound.conf" <<EOF
 pcm.!default {

@@ -37,6 +37,10 @@ This exports one executable per example source into:
 
 Any new file you add under `examples/`, such as `examples/fourth.c`, will automatically produce `build/tinycore/artifacts/bin/fourth`.
 
+The build also exports a source workspace snapshot that is copied into the TinyCore image under:
+
+- `/home/tc/demo-workspace`
+
 ## Build SD Card Image
 
 Build the executables, TinyCore extension artifacts, and the final flashable piCore image on macOS:
@@ -52,6 +56,22 @@ bash /Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/scripts/build-artifac
 ```
 
 The final image is written to [out/](/Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/out).
+
+If you want the image to include a native TinyCore compiler toolchain so you can edit and rebuild directly on the Raspberry Pi, set:
+
+```bash
+INCLUDE_DEV_TOOLS="1"
+```
+
+Example:
+
+```bash
+INCLUDE_DEV_TOOLS="1" \
+TARGET_ARCH="aarch64" \
+bash /Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/scripts/build-artifacts.sh
+```
+
+By default, `INCLUDE_DEV_TOOLS` is `0`, so the image stays smaller and only includes the prebuilt executables plus the editable source workspace.
 
 For the Pirate Audio speaker HAT, build with its hardware profile enabled:
 
@@ -90,6 +110,7 @@ bash /Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/scripts/build-artifac
 The build creates:
 
 - `build/tinycore/artifacts/bin/<example-name>`
+- `build/tinycore/artifacts/demo-workspace/`
 - `build/tinycore/artifacts/demo-examples-app.tcz`
 - `build/tinycore/artifacts/demo-examples-app.tcz.dep`
 - `build/tinycore/artifacts/examples.manifest`
@@ -116,6 +137,19 @@ Each example is available on the Raspberry Pi as its own executable under:
 
 - `/usr/local/bin/<example-name>`
 - `/usr/local/examples/bin/<example-name>`
+
+An editable source workspace is also copied into:
+
+- `/home/tc/demo-workspace`
+
+Inside that workspace:
+
+- the example `.c` files are under `/home/tc/demo-workspace/examples`
+- shared headers are under `/home/tc/demo-workspace/include`
+- shared source files are under `/home/tc/demo-workspace/src`
+- `build-on-pi.sh` rebuilds the examples natively on the Pi
+
+When `INCLUDE_DEV_TOOLS=1` is used during image creation, the build also appends TinyCore development extensions so on-device compilation is available after boot.
 
 ## Audio Output Selector Example
 
@@ -243,6 +277,7 @@ This example uses the RTC clock/calendar registers directly and persists up to f
 - The image assembly script is macOS-specific because it uses `hdiutil` to mount and update the piCore image.
 - The build automatically discovers all `examples/*.c` files, so future examples do not require Dockerfile edits.
 - Example-specific extra sources can be attached with sidecar files such as [examples/lcd_hat_menu.mk](/Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/examples/lcd_hat_menu.mk), which keeps hardware-specific drivers from being linked into every example.
+- The native on-device toolchain is opt-in via `INCLUDE_DEV_TOOLS=1`. By default it is disabled.
 - The builder dynamically discovers the latest matching piCore release and kernel-specific ALSA/WiFi extensions for the selected TinyCore branch.
 - TinyCore framebuffer console rendering may still be limited for complex Hindi/Devanagari shaping even though the UTF-8 demo binary is included.
 - If your Raspberry Pi audio output is not `hw:0,0`, set `ALSA_CARD` and `ALSA_DEVICE` before building.

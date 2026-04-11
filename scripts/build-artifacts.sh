@@ -9,12 +9,14 @@ IMAGE_TAG="${IMAGE_TAG:-rpi-demo-tinycore-builder}"
 BUILDER_PLATFORM="${BUILDER_PLATFORM:-linux/amd64}"
 TARGET_ARCH="${TARGET_ARCH:-aarch64}"
 BUILD_IMAGE="${BUILD_IMAGE:-1}"
+INCLUDE_DEV_TOOLS="${INCLUDE_DEV_TOOLS:-0}"
 
 mkdir -p "${OUT_DIR}"
 
 docker build \
   --platform "${BUILDER_PLATFORM}" \
   --build-arg TARGET_ARCH="${TARGET_ARCH}" \
+  --build-arg INCLUDE_DEV_TOOLS="${INCLUDE_DEV_TOOLS}" \
   -f "${REPO_ROOT}/tinycore/docker/artifact-builder.Dockerfile" \
   -t "${IMAGE_TAG}" \
   "${REPO_ROOT}"

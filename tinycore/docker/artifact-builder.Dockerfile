@@ -1,6 +1,7 @@
 FROM debian:bookworm-slim
 
 ARG TARGET_ARCH=armhf
+ARG INCLUDE_DEV_TOOLS=0
 
 ENV DEBIAN_FRONTEND=noninteractive
 WORKDIR /src
@@ -51,7 +52,7 @@ RUN set -eux; \
     make clean; \
     make TARGET_ARCH="${TARGET_ARCH}" all; \
     rm -rf /tmp/demo-package /out; \
-    mkdir -p /tmp/demo-package/usr/local/bin /tmp/demo-package/usr/local/examples/bin /tmp/demo-package/usr/local/share/demo-examples /out/bin; \
+    mkdir -p /tmp/demo-package/usr/local/bin /tmp/demo-package/usr/local/examples/bin /tmp/demo-package/usr/local/share/demo-examples /out/bin /out/demo-workspace; \
     install -m 0755 /src/tinycore/rootfs/usr/local/bin/demo-menu.sh /tmp/demo-package/usr/local/bin/demo-menu.sh; \
     install -m 0755 /src/tinycore/rootfs/usr/local/bin/demo-launch-on-tty1.sh /tmp/demo-package/usr/local/bin/demo-launch-on-tty1.sh; \
     cp "/src/build/bin/${TARGET_ARCH}/examples.manifest" /tmp/demo-package/usr/local/share/demo-examples/examples.manifest; \
@@ -61,6 +62,11 @@ RUN set -eux; \
         ln -sf "../examples/bin/${example_name}" "/tmp/demo-package/usr/local/bin/${example_name}"; \
         cp "/src/build/bin/${TARGET_ARCH}/${example_name}" "/out/bin/${example_name}"; \
     done < "/src/build/bin/${TARGET_ARCH}/examples.manifest"; \
+    cp /src/Makefile /out/demo-workspace/Makefile; \
+    mkdir -p /out/demo-workspace/examples /out/demo-workspace/include /out/demo-workspace/src; \
+    cp -R /src/examples/. /out/demo-workspace/examples/; \
+    cp -R /src/include/. /out/demo-workspace/include/; \
+    cp -R /src/src/. /out/demo-workspace/src/; \
     mksquashfs /tmp/demo-package /out/demo-examples-app.tcz -noappend -all-root; \
     (cd /tmp/demo-package && find usr -not -type d | sort > /out/demo-examples-app.tcz.list); \
     cp "/src/build/bin/${TARGET_ARCH}/examples.manifest" /out/examples.manifest
@@ -78,6 +84,14 @@ firmware-rpi-wifi.tcz
 wireless-KERNEL.tcz
 EOF
 
+RUN if [ "${INCLUDE_DEV_TOOLS}" = "1" ]; then \
+        printf '%s\n' \
+            compiletc.tcz \
+            gcc.tcz \
+            make.tcz \
+            alsa-dev.tcz >> /out/demo-examples-app.tcz.dep; \
+    fi
+
 RUN cat > /out/demo-examples-app.tcz.info <<'EOF'
 Title:          demo-examples-app.tcz
 Description:    TinyCore package containing the simple ALSA and UTF-8 Raspberry Pi demo programs from this repository.
@@ -88,7 +102,7 @@ Copying-policy: Mixed
 Size:           custom
 Extension_by:   Codex
 Tags:           alsa unicode tinycore raspberrypi demo
-Comments:       Includes first, second, and third demo binaries plus a simple boot launcher.
+Comments:       Includes all discovered example binaries plus a simple boot launcher.
 Current:        2026/04/11 Initial local appliance package.
 EOF
 
