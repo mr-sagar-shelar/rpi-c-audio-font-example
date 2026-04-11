@@ -1,0 +1,2 @@
+dtoverlay=wm8960-soundcard
+dtparam=i2c_arm=on

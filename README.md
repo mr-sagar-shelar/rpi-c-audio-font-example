@@ -30,6 +30,7 @@ This exports one executable per example source into:
 - `build/tinycore/artifacts/bin/pirate_audio_hat`
 - `build/tinycore/artifacts/bin/second`
 - `build/tinycore/artifacts/bin/third`
+- `build/tinycore/artifacts/bin/wm8960_tones`
 
 Any new file you add under `examples/`, such as `examples/fourth.c`, will automatically produce `build/tinycore/artifacts/bin/fourth`.
 
@@ -53,6 +54,14 @@ For the Pirate Audio speaker HAT, build with its hardware profile enabled:
 
 ```bash
 HARDWARE_PROFILE="pirate-audio-speaker" \
+TARGET_ARCH="aarch64" \
+bash /Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/scripts/build-artifacts.sh
+```
+
+For the Waveshare WM8960 Audio HAT, build with its hardware profile enabled:
+
+```bash
+HARDWARE_PROFILE="wm8960-audio-hat" \
 TARGET_ARCH="aarch64" \
 bash /Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/scripts/build-artifacts.sh
 ```
@@ -121,6 +130,24 @@ Use `HARDWARE_PROFILE=pirate-audio-speaker` when building the TinyCore image so 
 
 - `dtoverlay=hifiberry-dac`
 - `gpio=25=op,dh`
+
+## WM8960 Audio HAT Example
+
+The new `wm8960_tones` example targets the Waveshare WM8960 Audio HAT.
+
+When `wm8960_tones` runs on the Raspberry Pi, it:
+
+- opens an ALSA playback device, defaulting to `default`
+- plays random tones at a fixed interval
+- alternates output between left speaker, right speaker, and both speakers to simulate stereo capability
+
+Use `HARDWARE_PROFILE=wm8960-audio-hat` when building the TinyCore image so the Pi boot config appends:
+
+- `dtoverlay=wm8960-soundcard`
+- `dtparam=i2c_arm=on`
+
+Important limitation:
+Waveshare's own wiki and driver repository indicate that this HAT depends on their `wm8960-soundcard` driver/overlay stack. This repo now includes the example program and TinyCore profile hook, but a fully working TinyCore image may still require integrating the Waveshare driver package or matching overlay/module files for the exact Raspberry Pi kernel used by the piCore image.
 
 ## Notes
 
