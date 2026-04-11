@@ -26,6 +26,7 @@ bash /Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/scripts/build-executa
 This exports one executable per example source into:
 
 - `build/tinycore/artifacts/bin/first`
+- `build/tinycore/artifacts/bin/lcd_hat_menu`
 - `build/tinycore/artifacts/bin/second`
 - `build/tinycore/artifacts/bin/third`
 
@@ -76,10 +77,32 @@ Each example is available on the Raspberry Pi as its own executable under:
 - `/usr/local/bin/<example-name>`
 - `/usr/local/examples/bin/<example-name>`
 
+## LCD HAT Example
+
+The new `lcd_hat_menu` example targets the common Waveshare-style 1.44 inch LCD HAT with:
+
+- ST7735S 128x128 SPI display
+- 3 push buttons: `KEY1`, `KEY2`, `KEY3`
+- joystick directions: `UP`, `DOWN`, `LEFT`, `RIGHT`, `PRESS`
+
+When `lcd_hat_menu` runs on the Raspberry Pi, it:
+
+- initializes the LCD over `/dev/spidev0.0`
+- shows sample text on the screen
+- updates the display with the last button name pressed on the HAT
+
+The TinyCore image build now appends these boot settings automatically:
+
+- `dtparam=spi=on`
+- `gpio=6,19,5,26,13,21,20,16=pu`
+
+Those pull-ups match the common 1.44 inch LCD HAT button wiring used by Waveshare's documentation.
+
 ## Notes
 
 - The image assembly script is macOS-specific because it uses `hdiutil` to mount and update the piCore image.
 - The build automatically discovers all `examples/*.c` files, so future examples do not require Dockerfile edits.
+- Example-specific extra sources can be attached with sidecar files such as [examples/lcd_hat_menu.mk](/Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/examples/lcd_hat_menu.mk), which keeps hardware-specific drivers from being linked into every example.
 - The builder dynamically discovers the latest matching piCore release and kernel-specific ALSA/WiFi extensions for the selected TinyCore branch.
 - TinyCore framebuffer console rendering may still be limited for complex Hindi/Devanagari shaping even though the UTF-8 demo binary is included.
 - If your Raspberry Pi audio output is not `hw:0,0`, set `ALSA_CARD` and `ALSA_DEVICE` before building.
