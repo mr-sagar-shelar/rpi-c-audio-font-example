@@ -1,31 +1,39 @@
 # TinyCore Raspberry Pi Build
 
-This repository now includes a Docker-based image builder that prepares a custom piCore image for Raspberry Pi 3 Model B with:
+This repo is now structured for a growing collection of standalone C examples:
 
-- the three demo programs cross-compiled for Raspberry Pi
-- ALSA runtime extensions and a default `asound.conf`
-- Raspberry Pi WiFi extensions plus a `wpa_supplicant.conf` template
-- automatic boot-time launch of a simple menu on `tty1`
+- every file in `examples/*.c` becomes its own executable
+- shared ALSA/audio helpers live under `include/` and `src/`
+- Docker cross-compiles the executables and packages them into a TinyCore extension artifact
+- a macOS script downloads piCore, resolves TinyCore dependencies, and assembles the final SD-card image locally with `hdiutil`
 
-## What It Produces
+## Repo Layout
 
-Running the builder creates:
+- [examples/](/Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/examples) contains one standalone example program per `.c` file
+- [include/](/Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/include) contains reusable headers
+- [src/](/Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/src) contains shared implementation used by multiple examples
+- [tinycore/](/Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/tinycore) contains TinyCore packaging, overlays, and boot assets
 
-- `out/custom-picore-rpi3-aarch64.img`
-- `out/custom-picore-rpi3-aarch64.img.gz`
-- `out/build-summary.txt`
+## Build Executables
 
-`TARGET_ARCH=armhf` is also supported if you prefer the 32-bit piCore image.
-
-## Quick Start
-
-Build the Docker image:
+Build only the cross-compiled Raspberry Pi executables with Docker:
 
 ```bash
-docker compose build
+TARGET_ARCH="aarch64" \
+bash /Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/scripts/build-executables.sh
 ```
 
-Generate the custom piCore image:
+This exports one executable per example source into:
+
+- `build/tinycore/artifacts/bin/first`
+- `build/tinycore/artifacts/bin/second`
+- `build/tinycore/artifacts/bin/third`
+
+Any new file you add under `examples/`, such as `examples/fourth.c`, will automatically produce `build/tinycore/artifacts/bin/fourth`.
+
+## Build SD Card Image
+
+Build the executables, TinyCore extension artifacts, and the final flashable piCore image on macOS:
 
 ```bash
 WIFI_SSID="YourWiFi" \
@@ -33,57 +41,53 @@ WIFI_PSK="YourPassword" \
 WIFI_COUNTRY="IN" \
 ALSA_CARD="0" \
 ALSA_DEVICE="0" \
-docker compose run --rm picore-builder
+TARGET_ARCH="aarch64" \
+bash /Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/scripts/build-artifacts.sh
 ```
 
-The output image appears under [out/](/Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/out).
+The final image is written to [out/](/Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/out).
 
-## Common Options
+## Output
 
-You can override these environment variables when running the builder:
+The build creates:
 
-- `TARGET_ARCH=aarch64` for Raspberry Pi 3 64-bit output
-- `TARGET_ARCH=armhf` for Raspberry Pi 3 32-bit output
-- `TINYCORE_MAJOR=16.x` to pin the TinyCore major release channel
-- `WIFI_SSID`, `WIFI_PSK`, `WIFI_COUNTRY` to preseed WiFi
-- `ALSA_CARD`, `ALSA_DEVICE` to set the default ALSA device used by `default`
-- `ENABLE_HDMI_AUDIO=1` to append HDMI audio settings to `config.txt`
+- `build/tinycore/artifacts/bin/<example-name>`
+- `build/tinycore/artifacts/demo-examples-app.tcz`
+- `build/tinycore/artifacts/demo-examples-app.tcz.dep`
+- `build/tinycore/artifacts/examples.manifest`
+- `build/tinycore/artifacts/onboot.lst`
+- `out/custom-picore-rpi3-aarch64.img`
+- `out/custom-picore-rpi3-aarch64.img.gz`
 
-Example for 32-bit output:
+Set `TARGET_ARCH=armhf` if you prefer 32-bit piCore.
 
-```bash
-TARGET_ARCH=armhf docker compose run --rm picore-builder
-```
+## What Boots
 
-## Boot Behavior
+The generated image:
 
-At boot, the generated image:
+- loads the packaged demo extension and its ALSA/WiFi dependencies from `/tce/optional`
+- enables Raspberry Pi audio in `config.txt`
+- applies a generated `asound.conf`
+- starts WiFi on `wlan0` if `WIFI_SSID` and `WIFI_PSK` are provided
+- launches a generated menu on `tty1` based on the discovered example executables
 
-- loads TinyCore ALSA and WiFi extensions from `/tce/onboot.lst`
-- enables Raspberry Pi audio via `config.txt`
-- starts `wpa_supplicant` and `udhcpc` if WiFi credentials were provided
-- launches a menu on `tty1` to run `first`, `second`, or `third`
+Each example is available on the Raspberry Pi as its own executable under:
 
-## Flashing the Image
+- `/usr/local/bin/<example-name>`
+- `/usr/local/examples/bin/<example-name>`
 
-On macOS, flash the generated image with Raspberry Pi Imager or `dd`.
+## Notes
 
-Example using Raspberry Pi Imager:
+- The image assembly script is macOS-specific because it uses `hdiutil` to mount and update the piCore image.
+- The build automatically discovers all `examples/*.c` files, so future examples do not require Dockerfile edits.
+- The builder dynamically discovers the latest matching piCore release and kernel-specific ALSA/WiFi extensions for the selected TinyCore branch.
+- TinyCore framebuffer console rendering may still be limited for complex Hindi/Devanagari shaping even though the UTF-8 demo binary is included.
+- If your Raspberry Pi audio output is not `hw:0,0`, set `ALSA_CARD` and `ALSA_DEVICE` before building.
 
-1. Open Raspberry Pi Imager.
-2. Choose `Use custom`.
-3. Select `out/custom-picore-rpi3-aarch64.img.gz`.
-4. Write the image to the SD card.
+## Main Files
 
-## Important Notes
-
-- The build script dynamically picks the latest versioned piCore RPi image and matching kernel-specific TinyCore WiFi/ALSA extensions from the selected major branch.
-- TinyCore console UTF-8 output is configured for your `third.c` demo, but raw Linux console rendering of Hindi can still be limited compared to a graphical terminal because Devanagari shaping support is not guaranteed in the framebuffer console.
-- If your Raspberry Pi audio device is not card `0`, change `ALSA_CARD` and `ALSA_DEVICE` before building.
-- If you do not want WiFi credentials baked into the image, omit `WIFI_SSID` and `WIFI_PSK`. You can later update `/etc/wpa_supplicant.conf` inside TinyCore and rebuild.
-
-## Files Added
-
-- [Dockerfile](/Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/Dockerfile)
-- [docker-compose.yml](/Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/docker-compose.yml)
-- [scripts/build-image.sh](/Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/scripts/build-image.sh)
+- [Makefile](/Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/Makefile)
+- [scripts/build-executables.sh](/Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/scripts/build-executables.sh)
+- [scripts/build-artifacts.sh](/Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/scripts/build-artifacts.sh)
+- [scripts/build-picore-image-macos.sh](/Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/scripts/build-picore-image-macos.sh)
+- [tinycore/docker/artifact-builder.Dockerfile](/Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/tinycore/docker/artifact-builder.Dockerfile)

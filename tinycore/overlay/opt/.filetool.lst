@@ -1,0 +1,6 @@
+opt
+home/tc
+etc/wpa_supplicant.conf
+etc/asound.conf
+usr/local/etc/alsa/asound.state
+var/lib/alsa

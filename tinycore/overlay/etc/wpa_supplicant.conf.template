@@ -1,0 +1,9 @@
+ctrl_interface=/var/run/wpa_supplicant
+update_config=1
+country=__WIFI_COUNTRY__
+network={
+    ssid="__WIFI_SSID__"
+    psk="__WIFI_PSK__"
+    key_mgmt=WPA-PSK
+    scan_ssid=1
+}

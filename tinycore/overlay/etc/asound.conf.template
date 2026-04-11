@@ -1,0 +1,9 @@
+pcm.!default {
+    type plug
+    slave.pcm "hw:__ALSA_CARD__,__ALSA_DEVICE__"
+}
+
+ctl.!default {
+    type hw
+    card __ALSA_CARD__
+}
