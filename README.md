@@ -26,6 +26,7 @@ bash /Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/scripts/build-executa
 This exports one executable per example source into:
 
 - `build/tinycore/artifacts/bin/first`
+- `build/tinycore/artifacts/bin/audio_output_selector`
 - `build/tinycore/artifacts/bin/lcd_hat_menu`
 - `build/tinycore/artifacts/bin/pirate_audio_hat`
 - `build/tinycore/artifacts/bin/second`
@@ -106,6 +107,21 @@ Each example is available on the Raspberry Pi as its own executable under:
 
 - `/usr/local/bin/<example-name>`
 - `/usr/local/examples/bin/<example-name>`
+
+## Audio Output Selector Example
+
+The new `audio_output_selector` example is a simple audio-routing validation tool.
+
+It lets the user choose one of these output targets:
+
+- HDMI
+- 3.5mm audio jack
+- WM8960 I2S HAT
+- custom ALSA device name
+
+After selecting an output, it plays the same melody on the chosen ALSA path so you can quickly validate routing on TinyCore.
+
+For HDMI and 3.5mm jack, it attempts to switch the Raspberry Pi legacy output route using `amixer cset numid=3`.
 
 ## LCD HAT Example
 
