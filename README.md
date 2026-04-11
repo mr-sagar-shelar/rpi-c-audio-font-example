@@ -29,6 +29,7 @@ This exports one executable per example source into:
 - `build/tinycore/artifacts/bin/audio_output_selector`
 - `build/tinycore/artifacts/bin/lcd_hat_menu`
 - `build/tinycore/artifacts/bin/pirate_audio_hat`
+- `build/tinycore/artifacts/bin/rv3028_rtc_menu`
 - `build/tinycore/artifacts/bin/second`
 - `build/tinycore/artifacts/bin/third`
 - `build/tinycore/artifacts/bin/ups_hat_c_status`
@@ -72,6 +73,14 @@ For the Waveshare UPS HAT (C), build with its hardware profile enabled:
 
 ```bash
 HARDWARE_PROFILE="ups-hat-c" \
+TARGET_ARCH="aarch64" \
+bash /Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/scripts/build-artifacts.sh
+```
+
+For the Pimoroni RV3028 RTC breakout, build with its hardware profile enabled:
+
+```bash
+HARDWARE_PROFILE="rv3028-rtc" \
 TARGET_ARCH="aarch64" \
 bash /Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/scripts/build-artifacts.sh
 ```
@@ -193,6 +202,41 @@ Use `HARDWARE_PROFILE=ups-hat-c` when building the TinyCore image so the Pi boot
 
 Important note:
 Waveshare documents INA219-based monitoring for this HAT. The percentage shown by this C example is a practical voltage-based estimate, not a dedicated fuel-gauge reading from the board.
+
+## RV3028 RTC Example
+
+The new `rv3028_rtc_menu` example targets the Pimoroni RV3028 RTC breakout.
+
+What it does:
+
+- reads and shows the current time from the RV3028 over I2C
+- lets you set a new RTC time
+- stores a small alarm list in the RV3028 onboard EEPROM so alarms survive reboot
+- supports add, update, remove, enable/disable, and list operations for alarms
+- shows the triggered alarm in the menu when the current RTC minute matches a saved alarm
+
+Build the TinyCore image with:
+
+```bash
+HARDWARE_PROFILE="rv3028-rtc" \
+TARGET_ARCH="aarch64" \
+bash /Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/scripts/build-artifacts.sh
+```
+
+Wiring to Raspberry Pi 3:
+
+- RV3028 `3V3` to Pi physical pin `1` (`3.3V`)
+- RV3028 `SDA` to Pi physical pin `3` (`GPIO2 / SDA1`)
+- RV3028 `SCL` to Pi physical pin `5` (`GPIO3 / SCL1`)
+- RV3028 `GND` to Pi physical pin `9` (`GND`)
+- RV3028 `INT` to Pi physical pin `7` (`GPIO4`) is optional and not required for this polling-based example
+
+Use `HARDWARE_PROFILE=rv3028-rtc` so the Pi boot config appends:
+
+- `dtparam=i2c_arm=on`
+
+Important note:
+This example uses the RTC clock/calendar registers directly and persists up to five alarms in the RV3028 user EEPROM. The alarm matching and display are handled by the application menu loop rather than a kernel RTC alarm interrupt.
 
 ## Notes
 
