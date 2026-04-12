@@ -28,6 +28,7 @@ This exports one executable per example source into:
 - `build/tinycore/artifacts/bin/first`
 - `build/tinycore/artifacts/bin/audio_output_selector`
 - `build/tinycore/artifacts/bin/lcd_hat_menu`
+- `build/tinycore/artifacts/bin/pirate_audio_display_diag`
 - `build/tinycore/artifacts/bin/pirate_audio_hat`
 - `build/tinycore/artifacts/bin/rv3028_rtc_menu`
 - `build/tinycore/artifacts/bin/second`
@@ -244,6 +245,22 @@ Use `HARDWARE_PROFILE=pirate-audio-speaker` when building the TinyCore image so 
 
 - `dtoverlay=hifiberry-dac`
 - `gpio=25=op,dh`
+- `dtparam=audio=off`
+- `dtparam=spi=on`
+
+For display troubleshooting, use `pirate_audio_display_diag`.
+
+What it does:
+
+- fills the screen with solid-color quadrants
+- draws corner markers and crosshair bars
+- lets you switch between four ST7789 rotation modes with the Pirate Audio buttons
+
+This helps isolate whether the issue is:
+
+- panel init
+- pixel addressing and rotation
+- or only the text rendering path
 
 ## WM8960 Audio HAT Example
 

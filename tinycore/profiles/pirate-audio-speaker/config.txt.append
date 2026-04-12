@@ -1,2 +1,4 @@
 dtoverlay=hifiberry-dac
 gpio=25=op,dh
+dtparam=audio=off
+dtparam=spi=on

@@ -13,11 +13,11 @@
 
 #define PIRATE_AUDIO_SPI_MODE SPI_MODE_0
 #define PIRATE_AUDIO_SPI_BITS_PER_WORD 8
-#define PIRATE_AUDIO_SPI_SPEED_HZ 40000000U
+#define PIRATE_AUDIO_SPI_SPEED_HZ 8000000U
 
 #define PIRATE_AUDIO_GPIO_DC 9
 #define PIRATE_AUDIO_GPIO_BL 13
-#define PIRATE_AUDIO_GPIO_DAC_ENABLE 25
+#define PIRATE_AUDIO_GPIO_RESET 25
 
 #define PIRATE_AUDIO_BUTTON_COUNT 4
 
@@ -132,6 +132,30 @@ static int pirate_audio_write_command_with_data(pirate_audio_hat_t *hat, uint8_t
     return 0;
 }
 
+static int pirate_audio_hard_reset(pirate_audio_hat_t *hat) {
+    if (hat->reset_fd < 0) {
+        return 0;
+    }
+
+    if (pirate_audio_set_line_value(hat->reset_fd, 1) != 0) {
+        return -1;
+    }
+    pirate_audio_sleep_ms(10);
+    if (pirate_audio_set_line_value(hat->reset_fd, 0) != 0) {
+        return -1;
+    }
+    pirate_audio_sleep_ms(10);
+    if (pirate_audio_set_line_value(hat->reset_fd, 1) != 0) {
+        return -1;
+    }
+    pirate_audio_sleep_ms(120);
+    return 0;
+}
+
+static int pirate_audio_set_madctl(pirate_audio_hat_t *hat, uint8_t madctl) {
+    return pirate_audio_write_command_with_data(hat, 0x36, &madctl, 1);
+}
+
 static int pirate_audio_set_window(pirate_audio_hat_t *hat, int x, int y, int width, int height) {
     uint8_t column_data[4];
     uint8_t row_data[4];
@@ -239,7 +263,9 @@ static int pirate_audio_init_panel(pirate_audio_hat_t *hat) {
     static const uint8_t frame[] = {0x0F};
     static const uint8_t power[] = {0xA4, 0xA1};
     static const uint8_t color_mode[] = {0x55};
-    static const uint8_t madctl[] = {0x00};
+    static const uint8_t madctl[] = {0xA8};
+    static const uint8_t gamma_positive[] = {0xD0, 0x04, 0x0D, 0x11, 0x13, 0x2B, 0x3F, 0x54, 0x4C, 0x18, 0x0D, 0x0B, 0x1F, 0x23};
+    static const uint8_t gamma_negative[] = {0xD0, 0x04, 0x0C, 0x11, 0x13, 0x2C, 0x3F, 0x44, 0x51, 0x2F, 0x1F, 0x1F, 0x20, 0x23};
 
     if (pirate_audio_write_command(hat, 0x01) != 0) {
         return -1;
@@ -259,9 +285,12 @@ static int pirate_audio_init_panel(pirate_audio_hat_t *hat) {
         pirate_audio_write_command_with_data(hat, 0xC4, vdv, sizeof(vdv)) != 0 ||
         pirate_audio_write_command_with_data(hat, 0xC6, frame, sizeof(frame)) != 0 ||
         pirate_audio_write_command_with_data(hat, 0xD0, power, sizeof(power)) != 0 ||
+        pirate_audio_write_command_with_data(hat, 0xE0, gamma_positive, sizeof(gamma_positive)) != 0 ||
+        pirate_audio_write_command_with_data(hat, 0xE1, gamma_negative, sizeof(gamma_negative)) != 0 ||
         pirate_audio_write_command_with_data(hat, 0x3A, color_mode, sizeof(color_mode)) != 0 ||
         pirate_audio_write_command_with_data(hat, 0x36, madctl, sizeof(madctl)) != 0 ||
         pirate_audio_write_command(hat, 0x21) != 0 ||
+        pirate_audio_write_command(hat, 0x13) != 0 ||
         pirate_audio_write_command(hat, 0x29) != 0) {
         return -1;
     }
@@ -280,7 +309,7 @@ int pirate_audio_hat_init(pirate_audio_hat_t *hat, const char *spi_device, const
     hat->gpiochip_fd = -1;
     hat->dc_fd = -1;
     hat->bl_fd = -1;
-    hat->dac_enable_fd = -1;
+    hat->reset_fd = -1;
     hat->buttons_fd = -1;
 
     hat->spi_fd = open(spi_device, O_RDWR);
@@ -305,11 +334,16 @@ int pirate_audio_hat_init(pirate_audio_hat_t *hat, const char *spi_device, const
     }
 
     hat->dc_fd = pirate_audio_request_output_line(hat->gpiochip_fd, PIRATE_AUDIO_GPIO_DC, 1, "pirate-audio-dc");
-    hat->bl_fd = pirate_audio_request_output_line(hat->gpiochip_fd, PIRATE_AUDIO_GPIO_BL, 1, "pirate-audio-bl");
-    hat->dac_enable_fd = pirate_audio_request_output_line(hat->gpiochip_fd, PIRATE_AUDIO_GPIO_DAC_ENABLE, 1, "pirate-audio-dac");
+    hat->bl_fd = pirate_audio_request_output_line(hat->gpiochip_fd, PIRATE_AUDIO_GPIO_BL, 0, "pirate-audio-bl");
+    hat->reset_fd = pirate_audio_request_output_line(hat->gpiochip_fd, PIRATE_AUDIO_GPIO_RESET, 1, "pirate-audio-reset");
     hat->buttons_fd = pirate_audio_request_buttons(hat->gpiochip_fd);
 
-    if (hat->dc_fd < 0 || hat->bl_fd < 0 || hat->dac_enable_fd < 0 || hat->buttons_fd < 0) {
+    if (hat->dc_fd < 0 || hat->bl_fd < 0 || hat->reset_fd < 0 || hat->buttons_fd < 0) {
+        pirate_audio_hat_close(hat);
+        return -1;
+    }
+
+    if (pirate_audio_hard_reset(hat) != 0) {
         pirate_audio_hat_close(hat);
         return -1;
     }
@@ -320,7 +354,6 @@ int pirate_audio_hat_init(pirate_audio_hat_t *hat, const char *spi_device, const
     }
 
     pirate_audio_hat_set_backlight(hat, 1);
-    pirate_audio_set_line_value(hat->dac_enable_fd, 1);
     return 0;
 }
 
@@ -328,8 +361,8 @@ void pirate_audio_hat_close(pirate_audio_hat_t *hat) {
     if (hat->buttons_fd >= 0) {
         close(hat->buttons_fd);
     }
-    if (hat->dac_enable_fd >= 0) {
-        close(hat->dac_enable_fd);
+    if (hat->reset_fd >= 0) {
+        close(hat->reset_fd);
     }
     if (hat->bl_fd >= 0) {
         close(hat->bl_fd);
@@ -349,6 +382,22 @@ void pirate_audio_hat_set_backlight(pirate_audio_hat_t *hat, int enabled) {
     if (hat->bl_fd >= 0) {
         pirate_audio_set_line_value(hat->bl_fd, enabled ? 1 : 0);
     }
+}
+
+void pirate_audio_hat_set_rotation(pirate_audio_hat_t *hat, int rotation) {
+    static const uint8_t rotation_values[4] = {
+        0xC8,
+        0xA8,
+        0x08,
+        0x68
+    };
+
+    int normalized = rotation % 4;
+    if (normalized < 0) {
+        normalized += 4;
+    }
+
+    pirate_audio_set_madctl(hat, rotation_values[normalized]);
 }
 
 void pirate_audio_hat_fill_rect(pirate_audio_hat_t *hat, int x, int y, int width, int height, uint16_t color) {

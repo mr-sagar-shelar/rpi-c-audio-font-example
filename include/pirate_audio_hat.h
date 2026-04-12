@@ -19,12 +19,13 @@ typedef struct {
     int gpiochip_fd;
     int dc_fd;
     int bl_fd;
-    int dac_enable_fd;
+    int reset_fd;
     int buttons_fd;
 } pirate_audio_hat_t;
 
 int pirate_audio_hat_init(pirate_audio_hat_t *hat, const char *spi_device, const char *gpiochip_device);
 void pirate_audio_hat_close(pirate_audio_hat_t *hat);
+void pirate_audio_hat_set_rotation(pirate_audio_hat_t *hat, int rotation);
 void pirate_audio_hat_set_backlight(pirate_audio_hat_t *hat, int enabled);
 void pirate_audio_hat_fill_screen(pirate_audio_hat_t *hat, uint16_t color);
 void pirate_audio_hat_fill_rect(pirate_audio_hat_t *hat, int x, int y, int width, int height, uint16_t color);
