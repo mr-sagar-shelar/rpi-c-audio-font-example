@@ -7,6 +7,13 @@ This repo is now structured for a growing collection of standalone C examples:
 - Docker cross-compiles the executables and packages them into a TinyCore extension artifact
 - a macOS script downloads piCore, resolves TinyCore dependencies, and assembles the final SD-card image locally with `hdiutil`
 
+## How to run
+
+- Build executable by following build excutables command
+- Set the audio hat configurations in first boot by running `./demo-workspace/pi-scripts/enablePirateAudioSpeaker.sh`
+- Reboot device
+- Run example `./demo-runtime/bin/flite`
+
 ## Repo Layout
 
 - [examples/](/Users/sagarshelar/fliteDemo/rpi-c-audio-font-example/examples) contains one standalone example program per `.c` file

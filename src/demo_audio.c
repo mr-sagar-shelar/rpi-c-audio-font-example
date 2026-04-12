@@ -1,9 +1,60 @@
 #include "demo_audio.h"
 
 #include <math.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+static int demo_string_contains_ignore_case(const char *haystack, const char *needle) {
+    size_t needle_len;
+
+    if (haystack == NULL || needle == NULL) {
+        return 0;
+    }
+
+    needle_len = strlen(needle);
+    if (needle_len == 0) {
+        return 1;
+    }
+
+    for (; *haystack != '\0'; haystack++) {
+        size_t i;
+
+        for (i = 0; i < needle_len; i++) {
+            if (haystack[i] == '\0') {
+                return 0;
+            }
+            if (tolower((unsigned char)haystack[i]) != tolower((unsigned char)needle[i])) {
+                break;
+            }
+        }
+
+        if (i == needle_len) {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+static int demo_should_include_playback_device(const char *name, const char *desc) {
+    if (name == NULL) {
+        return 0;
+    }
+
+    if (strncmp(name, "hw:", 3) == 0 ||
+        strncmp(name, "plughw:", 7) == 0 ||
+        strcmp(name, "default") == 0 ||
+        strncmp(name, "sysdefault:", 11) == 0 ||
+        demo_string_contains_ignore_case(name, "hdmi") ||
+        demo_string_contains_ignore_case(name, "vc4hdmi") ||
+        demo_string_contains_ignore_case(desc, "hdmi")) {
+        return 1;
+    }
+
+    return 0;
+}
 
 int demo_open_playback_device(const char *device, snd_pcm_t **pcm_handle) {
     int err;
@@ -93,10 +144,7 @@ int demo_list_playback_devices(char device_names[][64], int max_devices) {
         char *desc = snd_device_name_get_hint(*node, "DESC");
 
         if (name != NULL) {
-            if (strncmp(name, "hw:", 3) == 0 ||
-                strncmp(name, "plughw:", 7) == 0 ||
-                strcmp(name, "default") == 0 ||
-                strncmp(name, "sysdefault:", 11) == 0) {
+            if (demo_should_include_playback_device(name, desc)) {
                 if (desc != NULL) {
                     for (int i = 0; desc[i] != '\0'; i++) {
                         if (desc[i] == '\n') {
