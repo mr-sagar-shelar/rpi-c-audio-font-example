@@ -25,6 +25,7 @@ typedef struct {
     int rst_fd;
     int bl_fd;
     int buttons_fd;
+    uint8_t idle_button_mask;
     lcd_hat_button_t last_button;
 } lcd_hat_144_t;
 

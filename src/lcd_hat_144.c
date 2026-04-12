@@ -71,7 +71,7 @@ static int lcd_hat_request_buttons(int gpiochip_fd) {
         request.lineoffsets[i] = LCD_HAT_BUTTON_LINES[i];
     }
 
-    request.flags = GPIOHANDLE_REQUEST_INPUT | GPIOHANDLE_REQUEST_ACTIVE_LOW;
+    request.flags = GPIOHANDLE_REQUEST_INPUT;
 #ifdef GPIOHANDLE_REQUEST_BIAS_PULL_UP
     request.flags |= GPIOHANDLE_REQUEST_BIAS_PULL_UP;
 #endif
@@ -97,6 +97,29 @@ static int lcd_hat_set_line_value(int line_fd, int value) {
     }
 
     return 0;
+}
+
+static uint8_t lcd_hat_read_button_mask(lcd_hat_144_t *hat) {
+    struct gpiohandle_data data;
+    uint8_t mask = 0;
+
+    if (hat->buttons_fd < 0) {
+        return 0;
+    }
+
+    memset(&data, 0, sizeof(data));
+    if (ioctl(hat->buttons_fd, GPIOHANDLE_GET_LINE_VALUES_IOCTL, &data) < 0) {
+        fprintf(stderr, "Failed to read LCD HAT button values: %s\n", strerror(errno));
+        return 0;
+    }
+
+    for (int i = 0; i < LCD_HAT_BUTTON_COUNT; i++) {
+        if (data.values[i]) {
+            mask |= (uint8_t)(1U << i);
+        }
+    }
+
+    return mask;
 }
 
 static int lcd_hat_spi_write(int spi_fd, const uint8_t *data, size_t length) {
@@ -251,7 +274,7 @@ static int lcd_hat_reset_and_init_panel(lcd_hat_144_t *hat) {
     static const uint8_t pwctr4[] = {0x8A, 0x2A};
     static const uint8_t pwctr5[] = {0x8A, 0xEE};
     static const uint8_t vmctr1[] = {0x0E};
-    static const uint8_t madctl[] = {0xC8};
+    static const uint8_t madctl[] = {0x08};
     static const uint8_t colmod[] = {0x05};
     static const uint8_t gmctrp1[] = {0x02, 0x1C, 0x07, 0x12, 0x37, 0x32, 0x29, 0x2D, 0x29, 0x25, 0x2B, 0x39, 0x00, 0x01, 0x03, 0x10};
     static const uint8_t gmctrn1[] = {0x03, 0x1D, 0x07, 0x06, 0x2E, 0x2C, 0x29, 0x2D, 0x2E, 0x2E, 0x37, 0x3F, 0x00, 0x00, 0x02, 0x10};
@@ -320,6 +343,7 @@ int lcd_hat_144_init(lcd_hat_144_t *hat, const char *spi_device, const char *gpi
     hat->rst_fd = -1;
     hat->bl_fd = -1;
     hat->buttons_fd = -1;
+    hat->idle_button_mask = 0;
     hat->last_button = LCD_HAT_BUTTON_NONE;
 
     hat->spi_fd = open(spi_device, O_RDWR);
@@ -358,6 +382,7 @@ int lcd_hat_144_init(lcd_hat_144_t *hat, const char *spi_device, const char *gpi
         return -1;
     }
 
+    hat->idle_button_mask = lcd_hat_read_button_mask(hat);
     lcd_hat_144_set_backlight(hat, 1);
     return 0;
 }
@@ -388,6 +413,7 @@ void lcd_hat_144_close(lcd_hat_144_t *hat) {
     hat->dc_fd = -1;
     hat->gpiochip_fd = -1;
     hat->spi_fd = -1;
+    hat->idle_button_mask = 0;
 }
 
 void lcd_hat_144_set_backlight(lcd_hat_144_t *hat, int enabled) {
@@ -473,20 +499,18 @@ void lcd_hat_144_draw_text(lcd_hat_144_t *hat, int x, int y, const char *text, u
 }
 
 lcd_hat_button_t lcd_hat_144_poll_button(lcd_hat_144_t *hat) {
-    struct gpiohandle_data data;
+    uint8_t current_mask;
+    uint8_t changed_mask;
 
     if (hat->buttons_fd < 0) {
         return LCD_HAT_BUTTON_NONE;
     }
 
-    memset(&data, 0, sizeof(data));
-    if (ioctl(hat->buttons_fd, GPIOHANDLE_GET_LINE_VALUES_IOCTL, &data) < 0) {
-        fprintf(stderr, "Failed to read LCD HAT button values: %s\n", strerror(errno));
-        return LCD_HAT_BUTTON_NONE;
-    }
+    current_mask = lcd_hat_read_button_mask(hat);
+    changed_mask = (uint8_t)(current_mask ^ hat->idle_button_mask);
 
     for (int i = 0; i < LCD_HAT_BUTTON_COUNT; i++) {
-        if (data.values[i]) {
+        if (changed_mask & (uint8_t)(1U << i)) {
             return LCD_HAT_BUTTON_IDS[i];
         }
     }

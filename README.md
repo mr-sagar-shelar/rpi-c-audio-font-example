@@ -27,6 +27,7 @@ This exports one executable per example source into:
 
 - `build/tinycore/artifacts/bin/first`
 - `build/tinycore/artifacts/bin/audio_output_selector`
+- `build/tinycore/artifacts/bin/flite`
 - `build/tinycore/artifacts/bin/lcd_hat_menu`
 - `build/tinycore/artifacts/bin/pirate_audio_hat`
 - `build/tinycore/artifacts/bin/rv3028_rtc_menu`
