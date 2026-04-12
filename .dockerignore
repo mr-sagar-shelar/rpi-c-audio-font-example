@@ -1,0 +1,13 @@
+.git
+.gitignore
+.DS_Store
+
+build
+out
+prebuilt-images
+
+*.img
+*.img.gz
+*.zip
+*.tar
+*.tar.gz

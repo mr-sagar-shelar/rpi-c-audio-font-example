@@ -34,5 +34,5 @@ docker cp "${CID}:/out/." "${OUT_DIR}/"
 printf 'Artifacts exported to %s\n' "${OUT_DIR}"
 
 if [[ "${BUILD_IMAGE}" == "1" ]]; then
-  ARTIFACT_DIR="${OUT_DIR}" TARGET_ARCH="${TARGET_ARCH}" sh "${REPO_ROOT}/scripts/build-picore-image-macos.sh"
+  ARTIFACT_DIR="${OUT_DIR}" TARGET_ARCH="${TARGET_ARCH}" INCLUDE_DEV_TOOLS="${INCLUDE_DEV_TOOLS}" sh "${REPO_ROOT}/scripts/build-picore-image-macos.sh"
 fi

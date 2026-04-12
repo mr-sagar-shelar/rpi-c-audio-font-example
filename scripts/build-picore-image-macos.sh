@@ -1,6 +1,7 @@
 #!/bin/sh
 
 set -eu
+export COPYFILE_DISABLE=1
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 ARTIFACT_DIR="${ARTIFACT_DIR:-$ROOT_DIR/build/tinycore/artifacts}"
@@ -17,6 +18,7 @@ ALSA_CARD="${ALSA_CARD:-0}"
 ALSA_DEVICE="${ALSA_DEVICE:-0}"
 ENABLE_HDMI_AUDIO="${ENABLE_HDMI_AUDIO:-0}"
 HARDWARE_PROFILE="${HARDWARE_PROFILE:-}"
+INCLUDE_DEV_TOOLS="${INCLUDE_DEV_TOOLS:-0}"
 RELEASE_BASE_URL="${RELEASE_BASE_URL:-}"
 EXT_BASE_URL="${EXT_BASE_URL:-}"
 RELEASE_IMAGE="${RELEASE_IMAGE:-}"
@@ -56,7 +58,13 @@ image_profile_suffix() {
     fi
 }
 
-OUTPUT_IMAGE="${OUTPUT_IMAGE:-$OUTPUT_DIR/custom-picore-rpi3$(image_profile_suffix)-${TARGET_ARCH}.img}"
+image_devtools_suffix() {
+    if [ "$INCLUDE_DEV_TOOLS" = "1" ]; then
+        printf '%s' "-devtools"
+    fi
+}
+
+OUTPUT_IMAGE="${OUTPUT_IMAGE:-$OUTPUT_DIR/custom-picore-rpi3$(image_profile_suffix)$(image_devtools_suffix)-${TARGET_ARCH}.img}"
 
 require_file() {
     [ -f "$1" ] || {
@@ -171,6 +179,19 @@ append_cmdline_tokens() {
     printf '%s\n' "$current" > "$dest"
 }
 
+rewrite_onboot_from_optional() {
+    optional_dir="$1"
+    onboot_file="$2"
+    tmp_file="$(mktemp -t picore-onboot.XXXXXX)"
+
+    find "$optional_dir" -maxdepth 1 -type f -name '*.tcz' -exec basename {} \; \
+        | grep -v '^\._' \
+        | grep -v 'KERNEL\.tcz$' \
+        | sort -u > "$tmp_file"
+
+    mv "$tmp_file" "$onboot_file"
+}
+
 extract_hdiutil_value() {
     plist_file="$1"
     key="$2"
@@ -270,6 +291,10 @@ download_extension_tree() {
             cp "$ARTIFACT_DIR/demo-examples-app.tcz.dep" "$optional_dir/"
             cp "$ARTIFACT_DIR/demo-examples-app.tcz.info" "$optional_dir/"
             cp "$ARTIFACT_DIR/demo-examples-app.tcz.list" "$optional_dir/"
+            while IFS= read -r dep; do
+                [ -n "$dep" ] || continue
+                download_extension_tree "$dep" "$optional_dir"
+            done < "$ARTIFACT_DIR/demo-examples-app.tcz.dep"
             return 0
             ;;
     esac
@@ -317,12 +342,123 @@ build_mydata_tgz() {
     mydata_root="$WORK_DIR/mydata-root"
     mydata_tgz="$WORK_DIR/mydata.tgz"
     workspace_dir="$mydata_root/home/tc/demo-workspace"
+    runtime_dir="$mydata_root/home/tc/demo-runtime"
 
     rm -rf "$mydata_root"
-    mkdir -p "$mydata_root/opt" "$mydata_root/etc" "$mydata_root/home/tc" "$workspace_dir"
+    mkdir -p "$mydata_root/opt" "$mydata_root/etc" "$mydata_root/home/tc" "$workspace_dir" "$runtime_dir/bin" "$runtime_dir/lib"
 
     cp "$ROOT_DIR/tinycore/overlay/opt/bootlocal.sh" "$mydata_root/opt/bootlocal.sh"
     cp "$ROOT_DIR/tinycore/overlay/opt/.filetool.lst" "$mydata_root/opt/.filetool.lst"
+
+    mkdir -p "$mydata_root/etc/profile.d"
+    cat > "$mydata_root/etc/profile.d/demo-runtime-paths.sh" <<'EOF'
+#!/bin/sh
+
+case ":${PATH}:" in
+    *:/home/tc/demo-runtime/bin:*) ;;
+    *) PATH="/home/tc/demo-runtime/bin:${PATH}" ;;
+esac
+export PATH
+
+case ":${LD_LIBRARY_PATH:-}:" in
+    *:/home/tc/demo-runtime/lib:*) ;;
+    *) LD_LIBRARY_PATH="/home/tc/demo-runtime/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" ;;
+esac
+export LD_LIBRARY_PATH
+EOF
+    chmod 0755 "$mydata_root/etc/profile.d/demo-runtime-paths.sh"
+
+    cat > "$mydata_root/opt/load-demo-extensions.sh" <<'EOF'
+#!/bin/sh
+
+mode="${1:-manual}"
+flag_file="/tmp/demo-runtime-extensions.loaded"
+
+if [ "$(id -u)" -eq 0 ] && [ "${DEMO_REENTER_AS_TC:-0}" != "1" ] && id tc >/dev/null 2>&1; then
+    DEMO_REENTER_AS_TC=1 su tc -s /bin/sh -c "/opt/load-demo-extensions.sh \"$mode\""
+    exit $?
+fi
+
+find_tcedir() {
+    if [ -d /etc/sysconfig/tcedir ]; then
+        printf '%s\n' /etc/sysconfig/tcedir
+        return 0
+    fi
+
+    if [ -f /opt/.tce_dir ]; then
+        cat /opt/.tce_dir
+        return 0
+    fi
+
+    for candidate in /mnt/mmcblk0p1/tce /mnt/mmcblk0p2/tce; do
+        if [ -d "$candidate" ]; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+[ -f "$flag_file" ] && exit 0
+command -v tce-load >/dev/null 2>&1 || exit 0
+
+tcedir="$(find_tcedir || true)"
+[ -n "$tcedir" ] || exit 0
+
+optional_dir="$tcedir/optional"
+if [ -f "$tcedir/onboot.lst" ]; then
+    onboot_file="$tcedir/onboot.lst"
+elif [ -f "$optional_dir/onboot.lst" ]; then
+    onboot_file="$optional_dir/onboot.lst"
+else
+    exit 0
+fi
+
+printf 'mode=%s\n' "$mode"
+printf 'tcedir=%s\n' "$tcedir"
+printf 'onboot=%s\n' "$onboot_file"
+
+while IFS= read -r ext; do
+    [ -n "$ext" ] || continue
+    printf 'loading=%s\n' "$ext"
+    if [ -f "$optional_dir/$ext" ]; then
+        tce-load -i "$optional_dir/$ext" || true
+    else
+        tce-load -i "$ext" || true
+    fi
+done < "$onboot_file"
+
+: > "$flag_file"
+EOF
+    chmod 0755 "$mydata_root/opt/load-demo-extensions.sh"
+
+    cat > "$mydata_root/etc/profile.d/demo-runtime.sh" <<'EOF'
+#!/bin/sh
+
+if [ -x /opt/load-demo-extensions.sh ] && [ ! -f /tmp/demo-runtime-extensions.loaded ]; then
+    /opt/load-demo-extensions.sh login >/tmp/tce-load-login.log 2>&1 || true
+fi
+EOF
+    chmod 0755 "$mydata_root/etc/profile.d/demo-runtime.sh"
+
+    cp "$ROOT_DIR/tinycore/rootfs/usr/local/bin/demo-menu.sh" "$runtime_dir/demo-menu.sh"
+    cp "$ROOT_DIR/tinycore/rootfs/usr/local/bin/demo-launch-on-tty1.sh" "$runtime_dir/demo-launch-on-tty1.sh"
+    chmod 0755 "$runtime_dir/demo-menu.sh" "$runtime_dir/demo-launch-on-tty1.sh"
+
+    if [ -f "$ARTIFACT_DIR/examples.manifest" ]; then
+        cp "$ARTIFACT_DIR/examples.manifest" "$runtime_dir/examples.manifest"
+    fi
+
+    if [ -d "$ARTIFACT_DIR/bin" ]; then
+        cp -R "$ARTIFACT_DIR/bin/." "$runtime_dir/bin/"
+        chmod 0755 "$runtime_dir/bin"/* 2>/dev/null || true
+    fi
+
+    if [ -d "$ARTIFACT_DIR/runtime-libs" ]; then
+        cp -R "$ARTIFACT_DIR/runtime-libs/." "$runtime_dir/lib/"
+        chmod 0644 "$runtime_dir/lib"/* 2>/dev/null || true
+    fi
 
     if [ -d "$ARTIFACT_DIR/demo-workspace" ]; then
         cp -R "$ARTIFACT_DIR/demo-workspace/." "$workspace_dir/"
@@ -335,6 +471,21 @@ make TARGET_ARCH=native all
 printf 'Native binaries built in %s/build/local-bin\n' "$(pwd)"
 EOF
         chmod 0755 "$workspace_dir/build-on-pi.sh"
+    fi
+
+    if [ "$INCLUDE_DEV_TOOLS" = "1" ]; then
+        cat > "$workspace_dir/install-devtools.sh" <<'EOF'
+#!/bin/sh
+set -eu
+
+for ext in compiletc gcc make alsa-dev; do
+    printf 'Installing %s...\n' "$ext"
+    tce-load -wi "$ext" || tce-load -wi "${ext}.tcz"
+done
+
+printf 'Dev tools requested. Start a new shell after installation.\n'
+EOF
+        chmod 0755 "$workspace_dir/install-devtools.sh"
     fi
 
     cat > "$mydata_root/etc/asound.conf" <<EOF
@@ -490,6 +641,11 @@ while IFS= read -r ext; do
     [ -n "$ext" ] || continue
     download_extension_tree "$ext" "$OPTIONAL_DIR"
 done < "$ONBOOT_FILE"
+
+find "$OPTIONAL_DIR" -name '._*' -delete 2>/dev/null || true
+find "$BOOT_MOUNT" -maxdepth 2 -name '._*' -delete 2>/dev/null || true
+
+rewrite_onboot_from_optional "$OPTIONAL_DIR" "$ONBOOT_FILE"
 
 append_unique_lines "$ARTIFACT_DIR/config.txt.append" "$BOOT_MOUNT/config.txt"
 append_cmdline_tokens "$ARTIFACT_DIR/cmdline.append" "$BOOT_MOUNT/cmdline.txt"

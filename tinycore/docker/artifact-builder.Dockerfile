@@ -52,7 +52,7 @@ RUN set -eux; \
     make clean; \
     make TARGET_ARCH="${TARGET_ARCH}" all; \
     rm -rf /tmp/demo-package /out; \
-    mkdir -p /tmp/demo-package/usr/local/bin /tmp/demo-package/usr/local/examples/bin /tmp/demo-package/usr/local/share/demo-examples /out/bin /out/demo-workspace; \
+    mkdir -p /tmp/demo-package/usr/local/bin /tmp/demo-package/usr/local/examples/bin /tmp/demo-package/usr/local/share/demo-examples /out/bin /out/demo-workspace /out/runtime-libs; \
     install -m 0755 /src/tinycore/rootfs/usr/local/bin/demo-menu.sh /tmp/demo-package/usr/local/bin/demo-menu.sh; \
     install -m 0755 /src/tinycore/rootfs/usr/local/bin/demo-launch-on-tty1.sh /tmp/demo-package/usr/local/bin/demo-launch-on-tty1.sh; \
     cp "/src/build/bin/${TARGET_ARCH}/examples.manifest" /tmp/demo-package/usr/local/share/demo-examples/examples.manifest; \
@@ -62,6 +62,12 @@ RUN set -eux; \
         ln -sf "../examples/bin/${example_name}" "/tmp/demo-package/usr/local/bin/${example_name}"; \
         cp "/src/build/bin/${TARGET_ARCH}/${example_name}" "/out/bin/${example_name}"; \
     done < "/src/build/bin/${TARGET_ARCH}/examples.manifest"; \
+    case "${TARGET_ARCH}" in \
+        armhf) runtime_triplet="arm-linux-gnueabihf" ;; \
+        aarch64) runtime_triplet="aarch64-linux-gnu" ;; \
+        *) runtime_triplet="" ;; \
+    esac; \
+    find "/usr/${runtime_triplet}/lib" "/lib/${runtime_triplet}" -maxdepth 1 -type f -name 'libasound.so.2*' -exec cp -L {} /out/runtime-libs/ \; 2>/dev/null || true; \
     cp /src/Makefile /out/demo-workspace/Makefile; \
     mkdir -p /out/demo-workspace/examples /out/demo-workspace/include /out/demo-workspace/src; \
     cp -R /src/examples/. /out/demo-workspace/examples/; \
@@ -84,13 +90,7 @@ firmware-rpi-wifi.tcz
 wireless-KERNEL.tcz
 EOF
 
-RUN if [ "${INCLUDE_DEV_TOOLS}" = "1" ]; then \
-        printf '%s\n' \
-            compiletc.tcz \
-            gcc.tcz \
-            make.tcz \
-            alsa-dev.tcz >> /out/demo-examples-app.tcz.dep; \
-    fi
+RUN if [ "${INCLUDE_DEV_TOOLS}" = "1" ]; then touch /out/include-devtools.flag; fi
 
 RUN cat > /out/demo-examples-app.tcz.info <<'EOF'
 Title:          demo-examples-app.tcz

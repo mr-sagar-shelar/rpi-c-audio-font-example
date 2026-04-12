@@ -22,7 +22,7 @@ CC := aarch64-linux-gnu-gcc
 STRIP := aarch64-linux-gnu-strip
 BIN_DIR := $(BUILD_DIR)/bin/aarch64
 else
-CC := cc
+CC := gcc
 STRIP := strip
 BIN_DIR := $(LOCAL_BIN_DIR)
 endif

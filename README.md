@@ -48,8 +48,8 @@ Build the executables, TinyCore extension artifacts, and the final flashable piC
 
 ```bash
 INCLUDE_DEV_TOOLS="1" \
-WIFI_SSID="YourWiFi" \
-WIFI_PSK="YourPassword" \
+WIFI_SSID="Shaggy2G" \
+WIFI_PSK="96552803" \
 WIFI_COUNTRY="IN" \
 ALSA_CARD="0" \
 ALSA_DEVICE="0" \
@@ -141,12 +141,23 @@ The generated image:
 - enables Raspberry Pi audio in `config.txt`
 - applies a generated `asound.conf`
 - starts WiFi on `wlan0` if `WIFI_SSID` and `WIFI_PSK` are provided
-- launches a generated menu on `tty1` based on the discovered example executables
+- boots to the normal TinyCore terminal by default
+- keeps the compiled examples available for manual execution from the shell
 
-Each example is available on the Raspberry Pi as its own executable under:
+Each example is copied into the writable runtime area on the Raspberry Pi under:
 
-- `/usr/local/bin/<example-name>`
-- `/usr/local/examples/bin/<example-name>`
+- `/home/tc/demo-runtime/bin/<example-name>`
+
+Supporting files are also copied under:
+
+- `/home/tc/demo-runtime/examples.manifest`
+- `/home/tc/demo-runtime/demo-menu.sh`
+- `/home/tc/demo-runtime/demo-launch-on-tty1.sh`
+
+Important TinyCore behavior:
+
+- `/usr/local/bin` comes from the mounted TinyCore extension, so it is intentionally read-only at runtime.
+- edit source files in `/home/tc/demo-workspace` if you want to modify or rebuild examples directly on the Pi.
 
 An editable source workspace is also copied into:
 
