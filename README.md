@@ -48,8 +48,8 @@ Build the executables, TinyCore extension artifacts, and the final flashable piC
 
 ```bash
 INCLUDE_DEV_TOOLS="1" \
-WIFI_SSID="Shaggy2G" \
-WIFI_PSK="96552803" \
+WIFI_SSID="WifiSSID" \
+WIFI_PSK="WifiPwd" \
 WIFI_COUNTRY="IN" \
 ALSA_CARD="0" \
 ALSA_DEVICE="0" \
@@ -169,6 +169,28 @@ Inside that workspace:
 - shared headers are under `/home/tc/demo-workspace/include`
 - shared source files are under `/home/tc/demo-workspace/src`
 - `build-on-pi.sh` rebuilds the examples natively on the Pi
+- `pi-scripts/` contains on-device helper scripts that update Raspberry Pi boot config and apply hardware profiles without reflashing
+
+On-device profile scripts:
+
+- `/home/tc/demo-workspace/pi-scripts/enableI2c.sh`
+- `/home/tc/demo-workspace/pi-scripts/enableLcdHat.sh`
+- `/home/tc/demo-workspace/pi-scripts/enablePirateAudioSpeaker.sh`
+- `/home/tc/demo-workspace/pi-scripts/enableRv3028Rtc.sh`
+- `/home/tc/demo-workspace/pi-scripts/enableTea5767FmRadio.sh`
+- `/home/tc/demo-workspace/pi-scripts/enableUpsHatC.sh`
+- `/home/tc/demo-workspace/pi-scripts/enableWm8960AudioHat.sh`
+- `/home/tc/demo-workspace/pi-scripts/enableHdmiAudio.sh`
+
+Example usage on the Raspberry Pi:
+
+```sh
+sudo /home/tc/demo-workspace/pi-scripts/enableI2c.sh
+sudo /home/tc/demo-workspace/pi-scripts/enableWm8960AudioHat.sh
+sudo reboot
+```
+
+These scripts update the boot partition `config.txt` and `cmdline.txt` in place so the selected hardware profile takes effect on the next boot.
 
 When `INCLUDE_DEV_TOOLS=1` is used during image creation, the build also appends TinyCore development extensions so on-device compilation is available after boot.
 

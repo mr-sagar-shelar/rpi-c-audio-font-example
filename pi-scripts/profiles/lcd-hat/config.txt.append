@@ -1,0 +1,2 @@
+dtparam=spi=on
+gpio=6,19,5,26,13,21,20,16=pu

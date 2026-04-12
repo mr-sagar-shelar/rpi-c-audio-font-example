@@ -473,6 +473,15 @@ EOF
         chmod 0755 "$workspace_dir/build-on-pi.sh"
     fi
 
+    if [ -d "$ROOT_DIR/pi-scripts" ]; then
+        mkdir -p "$workspace_dir/pi-scripts/profiles"
+        cp -R "$ROOT_DIR/pi-scripts/." "$workspace_dir/pi-scripts/"
+        if [ -d "$ROOT_DIR/tinycore/profiles" ]; then
+            cp -R "$ROOT_DIR/tinycore/profiles/." "$workspace_dir/pi-scripts/profiles/"
+        fi
+        find "$workspace_dir/pi-scripts" -type f -name '*.sh' -exec chmod 0755 {} \;
+    fi
+
     if [ "$INCLUDE_DEV_TOOLS" = "1" ]; then
         cat > "$workspace_dir/install-devtools.sh" <<'EOF'
 #!/bin/sh
